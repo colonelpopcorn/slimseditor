@@ -1,17 +1,15 @@
-import bimpy
+import imgui
 
 
 class AbstractSaveEntry:
     struct_type = 'i'
     python_type = int
-    bimpy_type = bimpy.Int
 
     def __init__(self, name='', pos=0):
         self.name = name
         self.pos = pos
         self.bimpy_name = '{0}##{1}'.format(name, pos)
         self._value = self.python_type()
-        self._bimpy_value = self.bimpy_type()
 
     @property
     def value(self):
@@ -24,7 +22,6 @@ class AbstractSaveEntry:
     @value.setter
     def value(self, val):
         self._value = val[0]
-        self._bimpy_value.value = self.python_type(val[0])
 
     def render_widget(self):
         pass
@@ -33,7 +30,6 @@ class AbstractSaveEntry:
 class RangedInteger(AbstractSaveEntry):
     struct_type = 'i'
     python_type = int
-    bimpy_type = bimpy.Int
     min = 0
     max = 100
 
@@ -43,28 +39,29 @@ class RangedInteger(AbstractSaveEntry):
         self.max = max
 
     def render_widget(self):
-        if bimpy.slider_int(self.bimpy_name, self._bimpy_value, self.min, self.max):
-            self._value = self._bimpy_value.value
+        changed, value = imgui.slider_int(self.bimpy_name, self._value, self.min, self.max)
+        if changed:
+            self._value = value
 
 
 class Boolean(AbstractSaveEntry):
     struct_type = '?'
     python_type = bool
-    bimpy_type = bimpy.Bool
 
     def render_widget(self):
-        if bimpy.checkbox(self.bimpy_name, self._bimpy_value):
-            self._value = self._bimpy_value.value
+        changed, value = imgui.checkbox(self.bimpy_name, self._value)
+        if changed:
+            self._value = value
 
 
 class Integer(AbstractSaveEntry):
     struct_type = 'i'
     python_type = int
-    bimpy_type = bimpy.Int
 
     def render_widget(self):
-        if bimpy.input_int(self.bimpy_name, self._bimpy_value):
-            self._value = int(self._bimpy_value.value)
+        changed, value = imgui.input_int(self.bimpy_name, self._value)
+        if changed:
+            self._value = int(value)
 
 
 class UnsignedInteger(Integer):
@@ -90,7 +87,10 @@ class UnsignedShort(Integer):
 class DateTime(AbstractSaveEntry):
     struct_type = 'BBBBBBBB'
     python_type = tuple
-    bimpy_type = bimpy.String
+
+    def __init__(self, name='', pos=0):
+        super(DateTime, self).__init__(name=name, pos=pos)
+        self._input_text = ""
 
     @property
     def value(self):
@@ -104,15 +104,19 @@ class DateTime(AbstractSaveEntry):
     @value.setter
     def value(self, val):
         self._value = val
-        self._bimpy_value.value = self.value
+        self._input_text = self.value
 
     def render_widget(self):
-        if bimpy.input_text(self.bimpy_name, self._bimpy_value, 20):
-            t = self._bimpy_value.value
-            his, ymd = t.split(' ')
-            h, i, s = his.split(':')
-            y, m, d = ymd.split('-')
-            self._value = (0, int(s), int(i), int(h), 0, int(d), int(m), int(y))
+        changed, text = imgui.input_text(self.bimpy_name, self._input_text, 20)
+        if changed:
+            self._input_text = text
+            try:
+                his, ymd = text.split(' ')
+                h, i, s = his.split(':')
+                y, m, d = ymd.split('-')
+                self._value = (0, int(s), int(i), int(h), 0, int(d), int(m), int(y))
+            except:
+                pass  # Handle parsing errors silently
 
 
 class BitField(AbstractSaveEntry):
@@ -150,12 +154,14 @@ class BitField(AbstractSaveEntry):
     def value(self, val):
         self._value = val[0]
         for key, pos in self.bitmap.items():
-            self.bitmap_values[key] = bimpy.Bool(self._test_bit(pos))
+            self.bitmap_values[key] = bool(self._test_bit(pos))
 
     def render_widget(self):
         for key, pos in self.bitmap.items():
-            if bimpy.checkbox(key, self.bitmap_values[key]):
-                if self.bitmap_values[key]:
+            changed, value = imgui.checkbox(key, self.bitmap_values.get(key, False))
+            if changed:
+                self.bitmap_values[key] = value
+                if value:
                     self._set_bit(pos)
                 else:
                     self._clear_bit(pos)
@@ -175,8 +181,25 @@ class Combo(AbstractSaveEntry):
 
         self.allowed_values = allowed_values
         self.allowed_values_list = list(allowed_values.keys())
+        self._combo_current_item = 0
 
+    def value_setter(self, val):
+        self._value = val[0]
+        # Find the index of the value in allowed_values
+        for i, (label, value) in enumerate(self.allowed_values.items()):
+            if value == self._value:
+                self._combo_current_item = i
+                break
+
+    value = property(AbstractSaveEntry.value.fget, value_setter)
 
     def render_widget(self):
-        if bimpy.combo(self.bimpy_name, self._bimpy_value, self.allowed_values_list):
-            self._value = self.allowed_values[self.allowed_values_list[self._bimpy_value.value]]
+        if imgui.begin_combo(self.bimpy_name, self.allowed_values_list[self._combo_current_item]):
+            for i, item in enumerate(self.allowed_values_list):
+                is_selected = (self._combo_current_item == i)
+                if imgui.selectable(item, is_selected)[0]:
+                    self._combo_current_item = i
+                    self._value = self.allowed_values[self.allowed_values_list[i]]
+                if is_selected:
+                    imgui.set_item_default_focus()
+            imgui.end_combo()

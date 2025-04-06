@@ -1,7 +1,7 @@
 Slim's Editor
 =============
 
-A savegame editor for the Ratchet and Clank games, written in Python, using Dear ImGUI via Bimpy for the frontend.
+A savegame editor for the Ratchet and Clank games, written in Python, using Dear ImGUI via pyimgui for the frontend.
 
 Slim's Editor allows you to read and change any (known) value of a RaC savegame. 
 This can also include values that are not exposed by the game itself.

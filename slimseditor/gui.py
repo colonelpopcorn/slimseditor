@@ -3,34 +3,34 @@ import sys
 
 from collections import defaultdict
 
-import bimpy
+import imgui
 import crossfiledialog
 
 from slimseditor.backends import PS2BinBackend, PS3DecryptedBackend, PSVitaDecryptedBackend
 from slimseditor.frames import FrameBase, SaveGameFrame, PS2MCFrame
 
-click_states = defaultdict(bimpy.Bool)
+click_states = defaultdict(lambda: False)
 open_frames = []  # type: List[FrameBase]
 
 
 def render_menu_bar():
-    if bimpy.begin_main_menu_bar():
-        if bimpy.begin_menu('File'):
-            bimpy.menu_item('Quit', 'Cmd+Q', click_states['file_quit'])
-            if click_states['file_quit'].value:
+    if imgui.begin_main_menu_bar():
+        if imgui.begin_menu('File'):
+            _, click_states['file_quit'] = imgui.menu_item('Quit', 'Cmd+Q', click_states['file_quit'])
+            if click_states['file_quit']:
                 sys.exit(0)
 
-            bimpy.end_menu()
+            imgui.end_menu()
 
-        if bimpy.begin_menu('Open'):
-            bimpy.menu_item("PS2 .bin file", '', click_states['open_ps2_bin'])
-            bimpy.menu_item("PS2 memory card (.ps2)", '', click_states['open_ps2_mc'])
-            bimpy.menu_item("PS3 decrypted", '', click_states['open_ps3_dec'])
-            bimpy.menu_item("Vita decrypted", '', click_states['open_vita_dec'])
+        if imgui.begin_menu('Open'):
+            _, click_states['open_ps2_bin'] = imgui.menu_item("PS2 .bin file", '', click_states['open_ps2_bin'])
+            _, click_states['open_ps2_mc'] = imgui.menu_item("PS2 memory card (.ps2)", '', click_states['open_ps2_mc'])
+            _, click_states['open_ps3_dec'] = imgui.menu_item("PS3 decrypted", '', click_states['open_ps3_dec'])
+            _, click_states['open_vita_dec'] = imgui.menu_item("Vita decrypted", '', click_states['open_vita_dec'])
 
-            bimpy.end_menu()
+            imgui.end_menu()
 
-        bimpy.end_main_menu_bar()
+        imgui.end_main_menu_bar()
 
 
 def open_savegame(backend, *args, **kwargs):
@@ -40,33 +40,33 @@ def open_savegame(backend, *args, **kwargs):
 
 
 def process_menu_bar_events():
-    if click_states['open_ps2_bin'].value:
+    if click_states['open_ps2_bin']:
         path = crossfiledialog.open_file()
         if path:
             open_savegame(PS2BinBackend, path)
 
-        click_states['open_ps2_bin'].value = False
+        click_states['open_ps2_bin'] = False
 
-    if click_states['open_ps2_mc'].value:
+    if click_states['open_ps2_mc']:
         path = crossfiledialog.open_file()
         if path:
             open_frames.append(PS2MCFrame(path))
 
-        click_states['open_ps2_mc'].value = False
+        click_states['open_ps2_mc'] = False
 
-    if click_states['open_ps3_dec'].value:
+    if click_states['open_ps3_dec']:
         path = crossfiledialog.choose_folder()
         if path:
             open_savegame(PS3DecryptedBackend, path)
 
-        click_states['open_ps3_dec'].value = False
+        click_states['open_ps3_dec'] = False
 
-    if click_states['open_vita_dec'].value:
+    if click_states['open_vita_dec']:
         path = crossfiledialog.open_file()
         if path:
             open_savegame(PSVitaDecryptedBackend, path)
 
-        click_states['open_vita_dec'].value = False
+        click_states['open_vita_dec'] = False
 
 
 def process_envvars():
@@ -96,27 +96,29 @@ def process_envvars():
 
 def main():
     process_envvars()
-    ctx = bimpy.Context()
-    ctx.init(600, 800, "Slim's Editor")
 
-    while not ctx.should_close():
-        with ctx:
-            render_menu_bar()
+    imgui.create_context()
+    io = imgui.get_io()
+    io.display_size = (600, 800)
+    fonts = io.fonts
+    fonts.get_tex_data_as_rgba32()
 
-            for frame in open_frames:
-                frame.render()
+    while True:
+        imgui.new_frame()
+
+        render_menu_bar()
+
+        for frame in open_frames:
+            frame.render()
+
+        imgui.render()
 
         process_menu_bar_events()
         for frame in open_frames:
             frame.process_events()
 
-        open_frames_to_close = []
-        for i, frame in enumerate(open_frames):
-            if not frame.opened.value:
-                open_frames_to_close.append(i)
-
-        for i in sorted(open_frames_to_close, reverse=True):
-            del open_frames[i]
+        # Remove closed frames
+        open_frames[:] = [frame for frame in open_frames if frame.opened]
 
 
 if __name__ == "__main__":

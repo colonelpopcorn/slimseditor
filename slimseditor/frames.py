@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import datetime
 from io import BytesIO
 
-import bimpy
+import imgui
 import crossfiledialog
 
 from diff_match_patch import diff_match_patch
@@ -28,13 +28,13 @@ def format_patchline(t, text):
 class FrameBase:
     def __init__(self):
         self._size = None
-        self.opened = bimpy.Bool(True)
-        self.click_states = defaultdict(bimpy.Bool)
+        self.opened = True
+        self.click_states = defaultdict(lambda: False)
 
     def render(self):
         if not self._size:
-            self._size = bimpy.Vec2(400, 600)
-            bimpy.set_next_window_size(self._size)
+            self._size = (400, 600)
+            imgui.set_next_window_size(self._size)
 
     def process_events(self):
         pass
@@ -63,35 +63,34 @@ class SaveGameFrame(FrameBase):
 
     def render(self):
         super(SaveGameFrame, self).render()
-        if bimpy.begin(self.name, self.opened,
-                       flags=bimpy.WindowFlags.NoCollapse | bimpy.WindowFlags.MenuBar):
+        if imgui.begin(self.name, True, 
+                    flags=imgui.WINDOW_NO_COLLAPSE | imgui.WINDOW_MENU_BAR):
 
-            if bimpy.begin_menu_bar():
-                bimpy.menu_item('Save', 'Cmd+S', self.click_states['save'])
-                bimpy.menu_item('Reload', 'Cmd+R', self.click_states['reload'])
-                bimpy.menu_item('Export', 'Cmd+E', self.click_states['export'])
-                bimpy.menu_item('Reload & Diff', 'Cmd+D', self.click_states['reload_and_diff'])
-                bimpy.end_menu_bar()
+            if imgui.begin_menu_bar():
+                _, self.click_states['save'] = imgui.menu_item('Save', 'Cmd+S', self.click_states['save'])
+                _, self.click_states['reload'] = imgui.menu_item('Reload', 'Cmd+R', self.click_states['reload'])
+                _, self.click_states['export'] = imgui.menu_item('Export', 'Cmd+E', self.click_states['export'])
+                _, self.click_states['reload_and_diff'] = imgui.menu_item('Reload & Diff', 'Cmd+D', self.click_states['reload_and_diff'])
+                imgui.end_menu_bar()
 
             if self.diff_string:
-                bimpy.columns(2, "hex split")
+                imgui.columns(2, "hex split")
 
-            bimpy.text('Game: ')
-            bimpy.same_line()
-            bimpy.text(self.backend.game.value)
+            imgui.text('Game: ')
+            imgui.same_line()
+            imgui.text(self.backend.game.value)
 
             for section_name, section_items in self.items.items():
-                if bimpy.collapsing_header(section_name):
+                if imgui.collapsing_header(section_name):
                     for item in section_items:
                         item.render_widget()
 
             if self.diff_string:
-                bimpy.next_column()
+                imgui.next_column()
                 for line in self.diff_string.splitlines():
-                    bimpy.text(line)
+                    imgui.text(line)
 
-            bimpy.end()
-
+        imgui.end()
     def reload_and_diff(self):
         pre_reload_hex = hexdump(self.backend.data, print_ascii=False)
         self.load_backend()
@@ -135,8 +134,8 @@ class PS2MCFrame(FrameBase):
 
     def __init__(self, path):
         self._size = None
-        self.opened = bimpy.Bool(True)
-        self.click_states = defaultdict(bimpy.Bool)
+        self.opened = True
+        self.click_states = defaultdict(lambda: False)
 
         self.path = path
         self.name = '{0}##{1}'.format(path, get_next_count())
@@ -182,39 +181,36 @@ class PS2MCFrame(FrameBase):
             f.write(self.data.read())
 
     def render(self):
-        if not self._size:
-            self._size = bimpy.Vec2(400, 600)
-            bimpy.set_next_window_size(self._size)
+        if self._size is None:
+            self._size = (400, 600)
+            imgui.set_next_window_size(*self._size)
 
-        if bimpy.begin(self.name, self.opened,
-                       flags=bimpy.WindowFlags.NoCollapse | bimpy.WindowFlags.MenuBar):
+        if imgui.begin(self.name, True, flags=imgui.WINDOW_NO_COLLAPSE | imgui.WINDOW_MENU_BAR):
 
-            if bimpy.begin_menu_bar():
-                bimpy.menu_item('Reload', 'Cmd+R', self.click_states['reload'])
-                bimpy.end_menu_bar()
+            if imgui.begin_menu_bar():
+                _, self.click_states['reload'] = imgui.menu_item('Reload', 'Cmd+R', self.click_states['reload'])
+                imgui.end_menu_bar()
 
             for folder_name, folder_files in self.tree.items():
-                if bimpy.collapsing_header(folder_name):
+                if imgui.collapsing_header(folder_name):
                     for item, button_name in folder_files:
-                        if bimpy.button(button_name):
-                            item_path = '{0}/{1}'.format(folder_name, item)
+                        if imgui.button(button_name):
+                            item_path = f'{folder_name}/{item}'
                             try:
-                                new_savegame = SaveGameFrame(
-                                    PS2WrappedBinBackend, item_path, self)
+                                new_savegame = SaveGameFrame(PS2WrappedBinBackend, item_path, self)
                                 self.child_frames.append(new_savegame)
-
                             except KeyboardInterrupt as e:
                                 raise e
                             except Exception as e:
                                 print(e)
 
-                        bimpy.same_line()
-                        bimpy.text(item)
+                        imgui.same_line()
+                        imgui.text(item)
 
-            bimpy.end()
+            imgui.end()
 
-            for child_frame in self.child_frames:
-                child_frame.render()
+        for child_frame in self.child_frames:
+            child_frame.render()
 
     def process_events(self):
         if self.click_states['reload'].value:
