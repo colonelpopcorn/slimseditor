@@ -2,5 +2,6 @@ crossfiledialog==1.0.0
 glfw==2.8.0
 imgui==2.0.0
 mymcplus==3.0.4
+numpy==2.2.4
 pyglfw==0.2.2
 PyOpenGL==3.1.9

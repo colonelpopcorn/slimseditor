@@ -34,7 +34,7 @@ class FrameBase:
     def render(self):
         if not self._size:
             self._size = (400, 600)
-            imgui.set_next_window_size(self._size)
+            imgui.set_next_window_size(self._size[0], self._size[1])
 
     def process_events(self):
         pass
@@ -107,26 +107,26 @@ class SaveGameFrame(FrameBase):
         self.diff_string = f'{datetime.now()}\n{patch}\n\n{self.diff_string}'
 
     def process_events(self):
-        if self.click_states['save'].value:
+        if self.click_states['save']:
             self.backend.write_all_items(self.items)
             self.backend.write_data()
-            self.click_states['save'].value = False
+            self.click_states['save'] = False
 
-        if self.click_states['reload'].value:
+        if self.click_states['reload']:
             self.load_backend()
-            self.click_states['reload'].value = False
+            self.click_states['reload'] = False
 
-        if self.click_states['reload_and_diff'].value:
+        if self.click_states['reload_and_diff']:
             self.reload_and_diff()
-            self.click_states['reload_and_diff'].value = False
+            self.click_states['reload_and_diff'] = False
 
-        if self.click_states['export'].value:
+        if self.click_states['export']:
             filename = crossfiledialog.save_file()
             if filename:
                 with open(filename, 'wb') as f:
                     f.write(self.backend.data)
 
-            self.click_states['export'].value = False
+            self.click_states['export'] = False
 
 
 class PS2MCFrame(FrameBase):
@@ -183,7 +183,7 @@ class PS2MCFrame(FrameBase):
     def render(self):
         if self._size is None:
             self._size = (400, 600)
-            imgui.set_next_window_size(*self._size)
+            imgui.set_next_window_size(self._size[0], self._size[1])
 
         if imgui.begin(self.name, True, flags=imgui.WINDOW_NO_COLLAPSE | imgui.WINDOW_MENU_BAR):
 
@@ -213,16 +213,16 @@ class PS2MCFrame(FrameBase):
             child_frame.render()
 
     def process_events(self):
-        if self.click_states['reload'].value:
+        if self.click_states['reload']:
             self.load_card_data()
-            self.click_states['reload'].value = False
+            self.click_states['reload'] = False
 
         for child_frame in self.child_frames:
             child_frame.process_events()
 
         open_frames_to_close = []
         for i, frame in enumerate(self.child_frames):
-            if not frame.opened.value:
+            if not frame.opened:
                 open_frames_to_close.append(i)
 
         for i in sorted(open_frames_to_close, reverse=True):

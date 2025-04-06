@@ -4,8 +4,12 @@ import sys
 from collections import defaultdict
 
 import imgui
+import glfw
 import crossfiledialog
+import OpenGL.GL as gl
 
+
+from imgui.integrations.glfw import GlfwRenderer
 from slimseditor.backends import PS2BinBackend, PS3DecryptedBackend, PSVitaDecryptedBackend
 from slimseditor.frames import FrameBase, SaveGameFrame, PS2MCFrame
 
@@ -96,22 +100,45 @@ def process_envvars():
 
 def main():
     process_envvars()
-
+    # Initialize GLFW
+    initted = glfw.init()
+    print(initted)
+    if not initted:
+        return
+        
+    # Configure GLFW
+    glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
+    glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
+    glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+    
+    # Create window
+    window = glfw.create_window(800, 600, "slimseditor", None, None)
+    if not window:
+        glfw.terminate()
+        return
+        
+    glfw.make_context_current(window)
+    
+    
     imgui.create_context()
-    io = imgui.get_io()
-    io.display_size = (600, 800)
-    fonts = io.fonts
-    fonts.get_tex_data_as_rgba32()
+    impl = GlfwRenderer(window)
 
-    while True:
+    while not glfw.window_should_close(window):
+        glfw.poll_events()
+        impl.process_inputs()
+        
         imgui.new_frame()
 
         render_menu_bar()
 
         for frame in open_frames:
+            print("Rendering frame!")
             frame.render()
 
         imgui.render()
+        
+        impl.render(imgui.get_draw_data())
+        glfw.swap_buffers(window)
 
         process_menu_bar_events()
         for frame in open_frames:
@@ -119,6 +146,8 @@ def main():
 
         # Remove closed frames
         open_frames[:] = [frame for frame in open_frames if frame.opened]
+    impl.shutdown()
+    glfw.terminate()
 
 
 if __name__ == "__main__":
